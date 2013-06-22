@@ -4,6 +4,7 @@ int getCmdNumber(char * cmd);
 int strEqual(char * str1, char * str2);
 void getArg(char * fullStr, char * str, int num);
 void copyFile(char * arg1, char * cmd);
+void listFile();
 
 int main(){
     char cmd[32];
@@ -26,29 +27,35 @@ int main(){
         interrupt(0x21, 0, "\n\0", 0, 0);
         interrupt(0x21, 0, "SHELL>  ", 0, 0);
         interrupt(0x21, 1, cmd, 0, 0);
-        interrupt(0x21, 0, "", 0, 0);
-            interrupt(0x10, 0xE*256+0xD, 0, 0, 0);
+        interrupt(0x10, 0xE*256+0xD, 0, 0, 0);
         getArg(cmd, arg0, 0);
         cmdNum = getCmdNumber(arg0);
-        if(cmdNum != 0){
-            getArg(cmd, arg1, 1);
-        }
+//        if(cmdNum != 0){
+//            getArg(cmd, arg1, 1);
+//        }
         switch (cmdNum){
             case 0:
                 interrupt(0x21, 0, "Command not found!\n\0", 0, 0);
                 break;
             case 3:
+                getArg(cmd, arg1, 1);
                 interrupt(0x21, 3, arg1, buf, 0);
                 interrupt(0x21, 0, buf, 0, 0);
                 break;
             case 4:
+                getArg(cmd, arg1, 1);
                 interrupt(0x21, 4, arg1, 0x2000, 0);
                 break;
             case 7:
+                getArg(cmd, arg1, 1);
                 interrupt(0x21, 7, arg1, 0, 0);
                 break;
             case 8:
+                getArg(cmd, arg1, 1);
                 copyFile(arg1, cmd);
+                break;
+            case 9:
+                listFile();
                 break;
         }
     }
@@ -77,11 +84,20 @@ void copyFile(char * arg1, char * cmd){
     interrupt(0x21, 8, arg2, buff, nbOfSector);
 }
 
+void listFile(){
+    char list[256];
+
+    interrupt(0x21, 9, list, 0, 0);
+    interrupt(0x21, 0, list, 0, 0);
+    
+}
+
 int getCmdNumber(char * cmd){
     char * cmd1 = "type\0";
     char * cmd2 = "execute\0";
     char * cmd3 = "delete\0";
     char * cmd4 = "copy\0";
+    char * cmd5 = "ls\0";
     int res = 0;
     if(strEqual(cmd, cmd1) == 1){
         return 3;
@@ -91,6 +107,8 @@ int getCmdNumber(char * cmd){
         return 7;
     } else if(strEqual(cmd, cmd4) == 1){
         return 8;
+    } else if(strEqual(cmd, cmd5) == 1){
+        return 9;
     } else {
         return 0;
     }

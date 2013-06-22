@@ -5,6 +5,7 @@ void readSector(char * buffer, int sector);
 void deleteFile(char * name);
 void writeSector(char * buffer, int sector);
 void handleInterrupt21(int ax, int bx, int cx, int dx);
+void listFile(char * list);
 void writeFile(char * name, char * buffer, int numberOfSectors);
 void readFile(char* filename, char * buffer);
 int findFreeDir(char * dir);
@@ -174,6 +175,9 @@ void handleInterrupt21(int ax, int bx, int cx, int dx){
         case 8:
             writeFile((char *) bx, (char*) cx, dx);
             break;
+        case 9:
+            listFile((char *) bx);
+            break;
     }
 }
 
@@ -232,6 +236,30 @@ void writeFile(char * name, char * buffer, int numberOfSectors){
 
     writeSector(map, 1);
     writeSector(dir, 2);
+}
+
+void listFile(char * list){
+    char dir[512];
+    int i = 0;
+    int j = 0;
+    int k = 0;
+
+    readSector(dir, 2);
+
+    for(i; i < div(512, 32); i++){
+        if(dir[i*32] != 0x0){
+            for(k = 0; k < 6; k++){
+                if(dir[i*32+k] == 0x0){
+                    k = 6;
+                }
+                list[j] = dir[i*32+k];
+                j++;
+            }
+            list[j] = '\n';
+            j++;
+        }
+    }
+    list[j] = 0x0;
 }
 
 void readFile(char* filename, char * buffer){
