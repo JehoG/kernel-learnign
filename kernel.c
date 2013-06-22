@@ -2,8 +2,13 @@ void printString(char* str);
 void printAll(char * str, int limit);
 void readString(char * str);
 void readSector(char * buffer, int sector);
+void deleteFile(char * name);
+void writeSector(char * buffer, int sector);
 void handleInterrupt21(int ax, int bx, int cx, int dx);
+void writeFile(char * name, char * buffer, int numberOfSectors);
 void readFile(char* filename, char * buffer);
+int findFreeDir(char * dir);
+int findFile(char * dir, char * name);
 int isFile(char * dir, int index, char * name);
 void copyFile(char * dir, int index, char * buffer);
 void intToStr(int num, char * str);
@@ -15,7 +20,7 @@ int main(){
     char * file = "messag\0";
     char res[10];
     makeInterrupt21();
-    interrupt(0x21, 4, "shell\0", 0x2000, 0);
+        interrupt(0x21, 4, "shell\0", 0x2000, 0);
     interrupt(0x21, 5, 0, 0, 0);
  //   terminate();
 }
@@ -100,6 +105,46 @@ void readSector(char * buffer, int sector){
     interrupt(0x13, 0x2*256+1, buffer, cx, dx);
 }
 
+void writeSector(char * buffer, int sector){
+    int track, rel_sector, head, cx, dx;
+    track = div(sector, 36);
+    rel_sector = mod(sector, 18) + 1;
+    head = mod( div(sector, 18), 2);
+
+    cx = track*256 + rel_sector;
+    dx = head*256 + 0;
+    
+    interrupt(0x13, 0x3*256+1, buffer, cx, dx);
+}
+
+void deleteFile(char * name){
+    char dir[512];
+    char map[512];
+    char index = 0;
+    int i = 6;
+    int sector;
+
+    char tmp;
+
+    readSector(dir, 2);
+    readSector(map, 1);
+
+    index = findFile(dir, name);
+    if(index == 17){
+        printString("File not found!\n\0");
+        return;
+    }
+    dir[index*32] = 0x0;
+
+    while(dir[(index*32) + i] != 0x0){
+        sector = dir[(index*32)+i];
+        map[sector] = 0x0;
+        i++;
+    }
+    writeSector(dir, 2);
+    writeSector(map, 1);
+}
+
 void handleInterrupt21(int ax, int bx, int cx, int dx){
     switch(ax){
         case 0:
@@ -120,7 +165,73 @@ void handleInterrupt21(int ax, int bx, int cx, int dx){
         case 5:
             terminate();
             break;
+        case 6:
+            writeSector((char*) bx, cx);
+            break;
+        case 7:
+            deleteFile((char*) bx);
+            break;
+        case 8:
+            writeFile((char *) bx, (char*) cx, dx);
+            break;
     }
+}
+
+void writeFile(char * name, char * buffer, int numberOfSectors){
+    char dir[512];
+    char map[512];
+    char tmpSect[512];
+    int dirNum = 0;
+    int i = 0;
+    int sectNum = 0;
+    int k = 0;
+    int iBuf = 0;
+    readSector(dir, 2);
+    readSector(map, 1);
+
+    dirNum = findFreeDir(dir);
+
+    if(dirNum >= 16){
+        return;
+    }
+    // Writing the name in directory
+    while(name[i] != 0x0){
+        dir[dirNum*32+i] = name[i];
+        i++;
+    }
+
+    // Writing data and map
+    for(i = 0; i <= numberOfSectors; i++){
+        // Locating free sector
+        while(map[sectNum] != 0x0){
+            sectNum++;
+        }
+        if(i >= 16){
+            deleteFile(name);
+            return;
+        }
+        printString(name); 
+        // Writing to map and directory
+        map[sectNum] = 0xFF;
+        writeSector(map, 0);
+        dir[dirNum*32+6+i] = sectNum;
+
+        // Writing the sector
+        for(k = 0; k < 512; k++){
+            tmpSect[k] = buffer[iBuf];
+            iBuf++;
+        }
+        writeSector(tmpSect, sectNum);
+    }
+
+    // Filling the rest of the dir entry with 0x00
+    while(i<16){
+        dir[dirNum*32+6+i] = 0x0;
+        i++;
+    }
+
+    writeSector(map, 1);
+    writeSector(dir, 2);
 }
 
 void readFile(char* filename, char * buffer){
@@ -158,11 +269,40 @@ void copyFile(char * dir, int index, char * buffer){
     }
 }
 
+int findFreeDir(char * dir){
+    int i = 0;
+    while(dir[i*32] != 0x0 && i < 16){
+        i++;
+    }
+    if(dir[i*32] != 0x0){
+        return 17;
+    }
+    return i;
+}
+
+int findFile(char * dir, char * name){
+    int index = 0;
+    int result = isFile(dir, index, name);
+    char tmp;
+
+
+    while(result != 1 && index < 16){
+        index++;
+        result = isFile(dir, index*32, name);
+    }
+
+    if(result == 0){
+        return 17;
+    } else {
+        return index;
+    }
+}
+
 int isFile(char * dir, int index, char * name){
     int i = 0;
     int result = 1;
     for(i = 0; i < 6; i++){
-        if(name[i] == '\0'){
+        if(name[i] == '\0' && dir[i+index] == '\0' && i != 0){
             return result;
         }
         if(dir[i+index] != name[i]){
