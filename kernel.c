@@ -16,6 +16,7 @@ int main(){
     char res[10];
     makeInterrupt21();
     interrupt(0x21, 4, "shell\0", 0x2000, 0);
+    interrupt(0x21, 5, 0, 0, 0);
  //   terminate();
 }
 
@@ -39,6 +40,7 @@ void executeProgram(char * name, int segment){
 }
 
 void terminate(){
+    printString("From terminate\n\0");
     interrupt(0x21, 4, "shell\0", 0x2000, 0);
 }
 
