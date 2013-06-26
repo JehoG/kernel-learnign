@@ -4,5 +4,7 @@ http://nw08.american.edu/~mblack/projects/opproject.tar.gz
 
 
 To lauch it you need bochs:
+
 ./compile.sh
+
 bochs opsys.bxrc
